@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       toast.error("Login failed", {
-        description: "An unexpected error occurred",
+        description: "Something went wrong. Please try again",
       });
       return false;
     }
@@ -75,7 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       toast.error("Registration failed", {
-        description: "An unexpected error occurred",
+        description: "Something went wrong. Please try again",
       });
       return false;
     }
@@ -88,7 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       toast.success("Logged out successfully");
     } catch (error) {
       toast.error("Logout failed", {
-        description: "An unexpected error occurred",
+        description: "Something went wrong. Please try again",
       });
     }
   };
@@ -111,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       toast.error("Failed to update profile", {
-        description: "An unexpected error occurred",
+        description: "Something went wrong. Please try again",
       });
       return false;
     }
