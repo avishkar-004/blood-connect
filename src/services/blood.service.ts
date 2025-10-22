@@ -51,7 +51,7 @@ export const bloodService = {
   createBloodRequest: async (
     data: CreateBloodRequestData
   ): Promise<{ success: boolean; request?: BloodRequest; error?: string }> => {
-    await delay(800);
+    await delay(600);
 
     try {
       const newRequest: BloodRequest = {
