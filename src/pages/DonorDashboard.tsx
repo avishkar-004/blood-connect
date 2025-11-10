@@ -92,7 +92,7 @@ export default function DonorDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+      <div className="min-h-screen overflow-x-hidden bg-gradient-hero flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
           <p className="text-muted-foreground">Loading dashboard...</p>
@@ -102,7 +102,7 @@ export default function DonorDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-hero">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-hero">
       <Header />
 
       <div className="container mx-auto px-4 py-8">
