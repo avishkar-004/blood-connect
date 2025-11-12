@@ -5,7 +5,7 @@ import { storage } from "@/lib/storage";
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Generate unique ID
-const generateId = (prefix: string) => `${prefix}${Date.now()}`;
+const generateId = (prefix: string): string => `${prefix}${Date.now()}`;
 
 export const donorService = {
   // Get all donors
