@@ -1,82 +1,177 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Droplet, User, LogOut, Bell, Search, AlertTriangle, TrendingUp, Users, Package, Calendar, Plus, Filter } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  AlertTriangle,
+  TrendingUp,
+  Users,
+  Package,
+  Loader2,
+  Plus,
+  Minus,
+  CheckCircle,
+} from "lucide-react";
+import { bloodService } from "@/services/blood.service";
+import { BloodInventory, BloodRequest } from "@/lib/mockData";
+import Header from "@/components/Header";
+import { toast } from "sonner";
 
-const AdminDashboard = () => {
-  const inventoryData = [
-    { bloodType: "A+", units: 45, status: "Good", expiryNear: 5, lastUpdated: "2 hours ago" },
-    { bloodType: "A-", units: 12, status: "Low", expiryNear: 2, lastUpdated: "4 hours ago" },
-    { bloodType: "B+", units: 38, status: "Good", expiryNear: 3, lastUpdated: "1 hour ago" },
-    { bloodType: "B-", units: 8, status: "Critical", expiryNear: 1, lastUpdated: "5 hours ago" },
-    { bloodType: "AB+", units: 22, status: "Medium", expiryNear: 4, lastUpdated: "3 hours ago" },
-    { bloodType: "AB-", units: 6, status: "Critical", expiryNear: 1, lastUpdated: "6 hours ago" },
-    { bloodType: "O+", units: 52, status: "Good", expiryNear: 6, lastUpdated: "1 hour ago" },
-    { bloodType: "O-", units: 15, status: "Low", expiryNear: 2, lastUpdated: "2 hours ago" },
-  ];
+export default function AdminDashboard() {
+  const [inventory, setInventory] = useState<BloodInventory[]>([]);
+  const [requests, setRequests] = useState<BloodRequest[]>([]);
+  const [stats, setStats] = useState({
+    totalUnits: 0,
+    totalRequests: 0,
+    pendingRequests: 0,
+    criticalTypes: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [updatingInventory, setUpdatingInventory] = useState<string | null>(null);
 
-  const pendingRequests = [
-    { id: "REQ-001", patient: "Sarah Johnson", bloodType: "O+", units: 2, urgency: "High", hospital: "City Hospital" },
-    { id: "REQ-002", patient: "Michael Brown", bloodType: "A-", units: 1, urgency: "Medium", hospital: "General Hospital" },
-    { id: "REQ-003", patient: "Emily Davis", bloodType: "B+", units: 3, urgency: "High", hospital: "Metro Clinic" },
-  ];
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setIsLoading(true);
+
+      // Load inventory and requests
+      const [inventoryData, requestsData, statsData] = await Promise.all([
+        bloodService.getBloodInventory(),
+        bloodService.getBloodRequests(),
+        bloodService.getStatistics(),
+      ]);
+
+      setInventory(inventoryData);
+      setRequests(requestsData);
+
+      // Calculate stats
+      const totalUnits = inventoryData.reduce((sum, item) => sum + item.units, 0);
+      const criticalTypes = inventoryData.filter(
+        (i) => i.status === "Critical"
+      ).length;
+
+      setStats({
+        totalUnits,
+        totalRequests: statsData.totalRequests,
+        pendingRequests: statsData.pendingRequests,
+        criticalTypes,
+      });
+    } catch (error) {
+      console.error("Error loading dashboard data:", error);
+      toast.error("Failed to load dashboard data");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateInventory = async (
+    itemId: string,
+    currentUnits: number,
+    change: number
+  ) => {
+    const newUnits = Math.max(0, currentUnits + change);
+
+    try {
+      setUpdatingInventory(itemId);
+
+      let newStatus: BloodInventory["status"] = "Available";
+      if (newUnits < 10) newStatus = "Critical";
+      else if (newUnits < 20) newStatus = "Low Stock";
+
+      await bloodService.updateInventory(itemId, {
+        units: newUnits,
+        status: newStatus,
+      });
+
+      toast.success("Inventory updated successfully");
+      loadDashboardData(); // Reload to show updated data
+    } catch (error) {
+      toast.error("Failed to update inventory");
+    } finally {
+      setUpdatingInventory(null);
+    }
+  };
+
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      await bloodService.updateBloodRequestStatus(requestId, "In Process");
+      toast.success("Request approved and in process");
+      loadDashboardData();
+    } catch (error) {
+      toast.error("Failed to approve request");
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "Good": return "bg-success text-success-foreground";
-      case "Medium": return "bg-warning text-warning-foreground";
-      case "Low": return "bg-warning text-warning-foreground";
-      case "Critical": return "bg-primary text-primary-foreground";
-      default: return "bg-muted text-muted-foreground";
+      case "Available":
+        return "bg-success text-success-foreground";
+      case "Low Stock":
+        return "bg-warning text-warning-foreground";
+      case "Critical":
+        return "bg-destructive text-destructive-foreground";
+      default:
+        return "bg-muted text-muted-foreground";
     }
   };
 
   const getUrgencyColor = (urgency: string) => {
     switch (urgency) {
-      case "High": return "bg-primary text-primary-foreground";
-      case "Medium": return "bg-warning text-warning-foreground";
-      case "Low": return "bg-secondary text-secondary-foreground";
-      default: return "bg-muted text-muted-foreground";
+      case "Emergency":
+        return "bg-red-600 text-white";
+      case "Urgent":
+        return "bg-orange-500 text-white";
+      case "Normal":
+        return "bg-blue-500 text-white";
+      default:
+        return "bg-muted text-muted-foreground";
     }
   };
 
+  const pendingRequests = requests.filter((r) => r.status === "Pending");
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading admin dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-hero">
-      {/* Header */}
-      <header className="bg-card border-b border-border shadow-soft sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Droplet className="h-8 w-8 text-primary" fill="currentColor" />
-            <span className="text-2xl font-bold text-foreground">LifeLink Admin</span>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full"></span>
-            </Button>
-            <Button variant="ghost" size="icon">
-              <User className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/">
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Header />
 
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Blood Bank Management</h1>
-          <p className="text-muted-foreground">Monitor inventory, manage requests, and oversee operations</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">
+            Blood Bank Management
+          </h1>
+          <p className="text-muted-foreground">
+            Monitor inventory, manage requests, and oversee operations
+          </p>
         </div>
 
         {/* Stats Overview */}
@@ -86,10 +181,12 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground mb-1">Total Units</p>
-                  <p className="text-3xl font-bold text-foreground">198</p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {stats.totalUnits}
+                  </p>
                   <p className="text-xs text-success flex items-center gap-1 mt-1">
                     <TrendingUp className="h-3 w-3" />
-                    +12% this week
+                    All blood types
                   </p>
                 </div>
                 <div className="bg-primary/10 p-3 rounded-full">
@@ -103,33 +200,18 @@ const AdminDashboard = () => {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Active Donors</p>
-                  <p className="text-3xl font-bold text-foreground">1,245</p>
-                  <p className="text-xs text-success flex items-center gap-1 mt-1">
-                    <TrendingUp className="h-3 w-3" />
-                    +8% this month
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Pending Requests
                   </p>
-                </div>
-                <div className="bg-secondary/10 p-3 rounded-full">
-                  <Users className="h-6 w-6 text-secondary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border shadow-medium">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground mb-1">Pending Requests</p>
-                  <p className="text-3xl font-bold text-foreground">23</p>
-                  <p className="text-xs text-warning flex items-center gap-1 mt-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    5 urgent
+                  <p className="text-3xl font-bold text-foreground">
+                    {stats.pendingRequests}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Awaiting approval
                   </p>
                 </div>
                 <div className="bg-warning/10 p-3 rounded-full">
-                  <Calendar className="h-6 w-6 text-warning" />
+                  <Users className="h-6 w-6 text-warning" />
                 </div>
               </div>
             </CardContent>
@@ -139,218 +221,219 @@ const AdminDashboard = () => {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground mb-1">Low Stock Alert</p>
-                  <p className="text-3xl font-bold text-foreground">4</p>
-                  <p className="text-xs text-primary flex items-center gap-1 mt-1">
-                    <AlertTriangle className="h-3 w-3" />
-                    Needs attention
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Total Requests
                   </p>
+                  <p className="text-3xl font-bold text-foreground">
+                    {stats.totalRequests}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">All time</p>
                 </div>
-                <div className="bg-primary/10 p-3 rounded-full">
-                  <AlertTriangle className="h-6 w-6 text-primary" />
+                <div className="bg-success/10 p-3 rounded-full">
+                  <CheckCircle className="h-6 w-6 text-success" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border shadow-medium">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    Critical Stock
+                  </p>
+                  <p className="text-3xl font-bold text-destructive">
+                    {stats.criticalTypes}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">Blood types</p>
+                </div>
+                <div className="bg-destructive/10 p-3 rounded-full">
+                  <AlertTriangle className="h-6 w-6 text-destructive" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Blood Inventory */}
-            <Card className="border-border shadow-medium">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Blood Inventory</CardTitle>
-                    <CardDescription>Current stock levels by blood type</CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filter
-                    </Button>
-                    <Button size="sm" className="bg-gradient-primary">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Units
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Blood Type</TableHead>
-                      <TableHead>Units Available</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Expiring Soon</TableHead>
-                      <TableHead>Last Updated</TableHead>
-                      <TableHead>Actions</TableHead>
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Blood Inventory */}
+          <Card className="border-border shadow-medium">
+            <CardHeader>
+              <CardTitle>Blood Inventory</CardTitle>
+              <CardDescription>Current stock levels by blood type</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Blood Type</TableHead>
+                    <TableHead>Units</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inventory.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">
+                        {item.bloodGroup}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-lg font-semibold">
+                          {item.units}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(item.status)}>
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              handleUpdateInventory(item.id, item.units, 5)
+                            }
+                            disabled={updatingInventory === item.id}
+                          >
+                            {updatingInventory === item.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <Plus className="h-3 w-3" />
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              handleUpdateInventory(item.id, item.units, -5)
+                            }
+                            disabled={
+                              updatingInventory === item.id || item.units < 5
+                            }
+                          >
+                            <Minus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {inventoryData.map((item) => (
-                      <TableRow key={item.bloodType}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <Droplet className="h-4 w-4 text-primary" fill="currentColor" />
-                            {item.bloodType}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-semibold">{item.units}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusColor(item.status)} variant="outline">
-                            {item.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">{item.expiryNear}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{item.lastUpdated}</TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm">Edit</Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
-            {/* Pending Requests */}
-            <Card className="border-border shadow-medium">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Pending Blood Requests</CardTitle>
-                    <CardDescription>Requests awaiting assignment</CardDescription>
-                  </div>
-                  <Button variant="outline" size="sm">View All</Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
+          {/* Pending Requests */}
+          <Card className="border-border shadow-medium">
+            <CardHeader>
+              <CardTitle>Pending Blood Requests</CardTitle>
+              <CardDescription>
+                Requests awaiting approval ({pendingRequests.length})
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pendingRequests.length > 0 ? (
+                <div className="space-y-4 max-h-[500px] overflow-y-auto">
                   {pendingRequests.map((request) => (
-                    <div key={request.id} className="p-4 bg-muted/50 rounded-lg border border-border">
-                      <div className="flex items-start justify-between mb-3">
+                    <div
+                      key={request.id}
+                      className="p-4 bg-muted/50 rounded-lg border border-border"
+                    >
+                      <div className="flex items-start justify-between mb-2">
                         <div>
                           <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-semibold text-foreground">{request.patient}</h4>
-                            <Badge className={getUrgencyColor(request.urgency)}>
-                              {request.urgency}
+                            <span className="font-medium text-foreground">
+                              {request.recipientName}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className="text-xs"
+                            >
+                              {request.bloodGroup}
                             </Badge>
                           </div>
-                          <p className="text-sm text-muted-foreground">Request #{request.id}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {request.hospital}
+                          </p>
                         </div>
-                        <div className="text-right">
-                          <div className="text-sm font-medium text-foreground mb-1">
-                            <Droplet className="inline h-4 w-4 text-primary mr-1" fill="currentColor" />
-                            {request.bloodType}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{request.units} units</p>
-                        </div>
+                        <Badge className={getUrgencyColor(request.urgency)}>
+                          {request.urgency}
+                        </Badge>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">{request.hospital}</p>
-                        <div className="flex gap-2">
-                          <Button size="sm" variant="outline">Assign Donor</Button>
-                          <Button size="sm" className="bg-gradient-primary">Process</Button>
-                        </div>
+                      <div className="text-sm text-muted-foreground mb-3">
+                        <p>Units needed: {request.quantity}</p>
+                        <p>Date: {new Date(request.requestDate).toLocaleDateString()}</p>
+                        {request.doctorNote && (
+                          <p className="mt-1 italic">Note: {request.doctorNote}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveRequest(request.id)}
+                        >
+                          Approve & Process
+                        </Button>
+                        <Button size="sm" variant="outline" asChild>
+                          <Link to="/donor-search">Find Donors</Link>
+                        </Button>
                       </div>
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Search */}
-            <Card className="border-border shadow-medium">
-              <CardHeader>
-                <CardTitle>Quick Search</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search donors..." className="pl-10" />
+              ) : (
+                <div className="text-center py-8">
+                  <CheckCircle className="h-12 w-12 text-success mx-auto mb-3 opacity-50" />
+                  <p className="text-muted-foreground">
+                    No pending requests
+                  </p>
                 </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input placeholder="Search requests..." className="pl-10" />
-                </div>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Filter by blood type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    <SelectItem value="A+">A+</SelectItem>
-                    <SelectItem value="A-">A-</SelectItem>
-                    <SelectItem value="B+">B+</SelectItem>
-                    <SelectItem value="B-">B-</SelectItem>
-                    <SelectItem value="AB+">AB+</SelectItem>
-                    <SelectItem value="AB-">AB-</SelectItem>
-                    <SelectItem value="O+">O+</SelectItem>
-                    <SelectItem value="O-">O-</SelectItem>
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            {/* Low Stock Alerts */}
-            <Card className="border-primary/50 bg-primary/5 shadow-medium">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-primary" />
-                  Low Stock Alerts
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {inventoryData.filter(item => item.status === "Critical" || item.status === "Low").map((item) => (
-                    <div key={item.bloodType} className="flex items-center justify-between p-3 bg-card rounded-lg">
-                      <div className="flex items-center gap-2">
-                        <Droplet className="h-4 w-4 text-primary" fill="currentColor" />
-                        <span className="font-medium text-foreground">{item.bloodType}</span>
-                      </div>
-                      <Badge className={getStatusColor(item.status)} variant="outline">
-                        {item.units} units
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-                <Button variant="outline" className="w-full mt-4" size="sm">
-                  Request Donations
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Quick Actions */}
-            <Card className="border-border shadow-medium">
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button className="w-full justify-start" variant="outline">
-                  <Users className="h-4 w-4 mr-2" />
-                  Manage Donors
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <Package className="h-4 w-4 mr-2" />
-                  Update Inventory
-                </Button>
-                <Button className="w-full justify-start" variant="outline">
-                  <Calendar className="h-4 w-4 mr-2" />
-                  View Reports
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
+
+        {/* Low Stock Alerts */}
+        {inventory.filter((i) => i.status !== "Available").length > 0 && (
+          <Card className="mt-6 border-warning bg-warning/5">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-warning" />
+                Low Stock Alerts
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4">
+                {inventory
+                  .filter((i) => i.status !== "Available")
+                  .map((item) => (
+                    <div
+                      key={item.id}
+                      className="p-3 bg-background rounded-lg border border-warning/20"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <span className="font-semibold text-foreground">
+                            {item.bloodGroup}
+                          </span>
+                          <p className="text-sm text-muted-foreground">
+                            Only {item.units} units remaining
+                          </p>
+                        </div>
+                        <Badge className={getStatusColor(item.status)}>
+                          {item.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
-};
-
-export default AdminDashboard;
+}

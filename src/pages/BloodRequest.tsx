@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,44 +6,71 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Droplet, ArrowLeft, Upload, AlertCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Droplet, ArrowLeft, Upload, AlertCircle, Loader2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { bloodService } from "@/services/blood.service";
+import { BloodType } from "@/lib/mockData";
+import { toast } from "sonner";
+import Header from "@/components/Header";
 
 const BloodRequest = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const { user } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    bloodType: "" as BloodType | "",
+    units: "",
+    urgency: "Normal" as "Normal" | "Urgent" | "Emergency",
+    hospital: "",
+    location: "",
+    doctorNote: "",
+  });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    toast({
-      title: "Request Submitted Successfully!",
-      description: "We're matching you with compatible donors now.",
-    });
+    if (!user) {
+      toast.error("Please login to submit a blood request");
+      return;
+    }
 
-    setTimeout(() => {
-      navigate("/recipient-dashboard");
-    }, 1500);
+    if (!formData.bloodType || !formData.units || !formData.hospital) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const result = await bloodService.createBloodRequest({
+        recipientId: user.id,
+        recipientName: user.name,
+        bloodGroup: formData.bloodType as BloodType,
+        quantity: parseInt(formData.units),
+        urgency: formData.urgency,
+        hospital: formData.hospital,
+        doctorNote: formData.doctorNote,
+      });
+
+      if (result.success) {
+        toast.success("Request Submitted Successfully!", {
+          description: "We're matching you with compatible donors now.",
+        });
+        setTimeout(() => {
+          navigate("/recipient-dashboard");
+        }, 1500);
+      } else {
+        toast.error("Failed to submit request");
+      }
+    } catch (error) {
+      toast.error("An error occurred while submitting your request");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-hero">
-      {/* Header */}
-      <header className="bg-card border-b border-border shadow-soft">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Droplet className="h-8 w-8 text-primary" fill="currentColor" />
-            <span className="text-2xl font-bold text-foreground">LifeLink</span>
-          </div>
-          
-          <Button variant="ghost" asChild>
-            <Link to="/recipient-dashboard">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Link>
-          </Button>
-        </div>
-      </header>
+      <Header />
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-3xl mx-auto">
@@ -118,7 +146,11 @@ const BloodRequest = () => {
                   <div className="grid md:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="bloodType">Blood Type Required</Label>
-                      <Select required>
+                      <Select
+                        required
+                        value={formData.bloodType}
+                        onValueChange={(value) => setFormData({ ...formData, bloodType: value as BloodType })}
+                      >
                         <SelectTrigger id="bloodType">
                           <SelectValue placeholder="Select blood type" />
                         </SelectTrigger>
@@ -134,23 +166,34 @@ const BloodRequest = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="units">Units Required</Label>
-                      <Input id="units" type="number" min="1" placeholder="Number of units" required />
+                      <Input
+                        id="units"
+                        type="number"
+                        min="1"
+                        placeholder="Number of units"
+                        required
+                        value={formData.units}
+                        onChange={(e) => setFormData({ ...formData, units: e.target.value })}
+                      />
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="urgency">Urgency Level</Label>
-                      <Select required>
+                      <Select
+                        required
+                        value={formData.urgency}
+                        onValueChange={(value) => setFormData({ ...formData, urgency: value as "Normal" | "Urgent" | "Emergency" })}
+                      >
                         <SelectTrigger id="urgency">
                           <SelectValue placeholder="Select urgency" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="low">Low (Scheduled)</SelectItem>
-                          <SelectItem value="medium">Medium (Within 48 hours)</SelectItem>
-                          <SelectItem value="high">High (Within 24 hours)</SelectItem>
-                          <SelectItem value="critical">Critical (Immediate)</SelectItem>
+                          <SelectItem value="Normal">Normal (Scheduled)</SelectItem>
+                          <SelectItem value="Urgent">Urgent (Within 48 hours)</SelectItem>
+                          <SelectItem value="Emergency">Emergency (Immediate)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -163,15 +206,19 @@ const BloodRequest = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="hospital">Hospital Name</Label>
-                    <Select required>
+                    <Select
+                      required
+                      value={formData.hospital}
+                      onValueChange={(value) => setFormData({ ...formData, hospital: value })}
+                    >
                       <SelectTrigger id="hospital">
                         <SelectValue placeholder="Select hospital" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="city-hospital">City Hospital</SelectItem>
-                        <SelectItem value="general-hospital">General Hospital</SelectItem>
-                        <SelectItem value="metro-clinic">Metro Medical Clinic</SelectItem>
-                        <SelectItem value="central-hospital">Central Hospital</SelectItem>
+                        <SelectItem value="City Hospital">City Hospital</SelectItem>
+                        <SelectItem value="General Hospital">General Hospital</SelectItem>
+                        <SelectItem value="Metro Medical Clinic">Metro Medical Clinic</SelectItem>
+                        <SelectItem value="Central Hospital">Central Hospital</SelectItem>
                         <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
@@ -179,18 +226,24 @@ const BloodRequest = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="address">Hospital Address</Label>
-                    <Input id="address" placeholder="Full address with city and state" required />
+                    <Input
+                      id="address"
+                      placeholder="Full address with city and state"
+                      required
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    />
                   </div>
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="doctor">Doctor's Name</Label>
-                      <Input id="doctor" placeholder="Attending physician" required />
+                      <Input id="doctor" placeholder="Attending physician" />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="doctorContact">Doctor's Contact</Label>
-                      <Input id="doctorContact" type="tel" placeholder="Contact number" required />
+                      <Input id="doctorContact" type="tel" placeholder="Contact number" />
                     </div>
                   </div>
                 </div>
@@ -201,11 +254,13 @@ const BloodRequest = () => {
                   
                   <div className="space-y-2">
                     <Label htmlFor="reason">Reason for Blood Requirement</Label>
-                    <Textarea 
-                      id="reason" 
+                    <Textarea
+                      id="reason"
                       placeholder="Describe the medical condition requiring blood transfusion"
                       className="min-h-24"
-                      required 
+                      required
+                      value={formData.doctorNote}
+                      onChange={(e) => setFormData({ ...formData, doctorNote: e.target.value })}
                     />
                   </div>
 
@@ -249,12 +304,23 @@ const BloodRequest = () => {
                     >
                       Cancel
                     </Button>
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       className="flex-1 bg-gradient-primary"
+                      size="lg"
+                      disabled={isSubmitting}
                     >
-                      <Droplet className="h-4 w-4 mr-2" fill="currentColor" />
-                      Submit Request
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting Request...
+                        </>
+                      ) : (
+                        <>
+                          <Droplet className="h-4 w-4 mr-2" fill="currentColor" />
+                          Submit Request
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>

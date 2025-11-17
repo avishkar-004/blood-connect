@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { Header } from "@/components/Header";
+import Header from "@/components/Header";
+import { useAuth } from "@/contexts/AuthContext";
+import { authService } from "@/services/auth.service";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Bell, Lock, Globe, Shield, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Bell, Lock, Shield, Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Settings() {
-  const { toast } = useToast();
+  const { user } = useAuth();
   const [settings, setSettings] = useState({
     emailNotifications: true,
     smsNotifications: true,
@@ -19,24 +21,62 @@ export default function Settings() {
     campReminders: true,
     donationReminders: true,
   });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   const handleSaveNotifications = () => {
-    toast({
-      title: "Settings Saved",
+    toast.success("Settings Saved", {
       description: "Your notification preferences have been updated",
     });
   };
 
-  const handleChangePassword = () => {
-    toast({
-      title: "Password Changed",
-      description: "Your password has been successfully updated",
-    });
+  const handleChangePassword = async () => {
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error("New passwords don't match");
+      return;
+    }
+
+    if (!passwordData.currentPassword || !passwordData.newPassword) {
+      toast.error("Please fill in all password fields");
+      return;
+    }
+
+    if (!user) return;
+
+    try {
+      setIsChangingPassword(true);
+      const result = await authService.changePassword(
+        user.id,
+        passwordData.currentPassword,
+        passwordData.newPassword
+      );
+
+      if (result.success) {
+        toast.success("Password Changed", {
+          description: "Your password has been successfully updated",
+        });
+        setPasswordData({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+      } else {
+        toast.error(result.error || "Password change failed");
+      }
+    } catch (error) {
+      toast.error("An error occurred while changing password");
+    } finally {
+      setIsChangingPassword(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header userRole="donor" userName="Current User" notificationCount={2} />
+    <div className="min-h-screen bg-gradient-hero">
+      <Header />
 
       <main className="container py-8 max-w-4xl">
         <div className="mb-8">
@@ -163,18 +203,50 @@ export default function Settings() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="current-password">Current Password</Label>
-                <Input id="current-password" type="password" />
+                <Input
+                  id="current-password"
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) =>
+                    setPasswordData({ ...passwordData, currentPassword: e.target.value })
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
-                <Input id="new-password" type="password" />
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) =>
+                    setPasswordData({ ...passwordData, newPassword: e.target.value })
+                  }
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm New Password</Label>
-                <Input id="confirm-password" type="password" />
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) =>
+                    setPasswordData({ ...passwordData, confirmPassword: e.target.value })
+                  }
+                />
               </div>
-              <Button onClick={handleChangePassword} className="w-full">
-                Change Password
+              <Button
+                onClick={handleChangePassword}
+                className="w-full"
+                disabled={isChangingPassword}
+              >
+                {isChangingPassword ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Changing Password...
+                  </>
+                ) : (
+                  "Change Password"
+                )}
               </Button>
             </CardContent>
           </Card>

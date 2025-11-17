@@ -1,28 +1,42 @@
-import { useState } from "react";
-import { Header } from "@/components/Header";
+import { useState, useEffect } from "react";
+import Header from "@/components/Header";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, Mail, Phone, MapPin, Droplet, Calendar, Award } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { User, Mail, Phone, MapPin, Droplet, Calendar, Award, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Profile() {
-  const { toast } = useToast();
+  const { user, updateProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
-  const [profile, setProfile] = useState({
-    name: "Rajesh Kumar",
-    email: "rajesh.k@email.com",
-    phone: "+91 98765 43210",
-    age: "28",
-    gender: "Male",
-    bloodGroup: "O+",
-    location: "Delhi",
-    address: "123 Main Street, Connaught Place",
-    emergencyContact: "+91 98765 43211",
+  const [isSaving, setIsSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    age: user?.age?.toString() || "",
+    gender: user?.gender || "",
+    bloodGroup: user?.bloodGroup || "",
+    location: user?.location || "",
   });
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        age: user.age?.toString() || "",
+        gender: user.gender || "",
+        bloodGroup: user.bloodGroup || "",
+        location: user.location,
+      });
+    }
+  }, [user]);
 
   const donationHistory = [
     { date: "2024-08-15", location: "Apollo Hospital", units: 1 },
@@ -30,17 +44,30 @@ export default function Profile() {
     { date: "2023-08-20", location: "Fortis Hospital", units: 1 },
   ];
 
-  const handleSave = () => {
-    setIsEditing(false);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been successfully updated",
-    });
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      const success = await updateProfile({
+        name: formData.name,
+        phone: formData.phone,
+        location: formData.location,
+        age: parseInt(formData.age) || undefined,
+      });
+
+      if (success) {
+        toast.success("Profile updated successfully!");
+        setIsEditing(false);
+      }
+    } catch (error) {
+      toast.error("Failed to update profile");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <Header userRole="donor" userName={profile.name} notificationCount={2} />
+    <div className="min-h-screen bg-gradient-hero">
+      <Header />
 
       <main className="container py-8 max-w-5xl">
         <div className="mb-8">
@@ -62,10 +89,19 @@ export default function Profile() {
                   <Button onClick={() => setIsEditing(true)}>Edit Profile</Button>
                 ) : (
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setIsEditing(false)}>
+                    <Button variant="outline" onClick={() => setIsEditing(false)} disabled={isSaving}>
                       Cancel
                     </Button>
-                    <Button onClick={handleSave}>Save Changes</Button>
+                    <Button onClick={handleSave} disabled={isSaving}>
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Changes"
+                      )}
+                    </Button>
                   </div>
                 )}
               </CardHeader>
@@ -77,8 +113,8 @@ export default function Profile() {
                       <User className="h-4 w-4 text-muted-foreground" />
                       <Input
                         id="name"
-                        value={profile.name}
-                        onChange={(e) => setProfile({ ...profile, name: e.target.value })}
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                         disabled={!isEditing}
                       />
                     </div>
@@ -91,9 +127,8 @@ export default function Profile() {
                       <Input
                         id="email"
                         type="email"
-                        value={profile.email}
-                        onChange={(e) => setProfile({ ...profile, email: e.target.value })}
-                        disabled={!isEditing}
+                        value={formData.email}
+                        disabled
                       />
                     </div>
                   </div>
@@ -104,8 +139,8 @@ export default function Profile() {
                       <Phone className="h-4 w-4 text-muted-foreground" />
                       <Input
                         id="phone"
-                        value={profile.phone}
-                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         disabled={!isEditing}
                       />
                     </div>
@@ -117,7 +152,7 @@ export default function Profile() {
                       <Droplet className="h-4 w-4 text-primary" />
                       <Input
                         id="bloodGroup"
-                        value={profile.bloodGroup}
+                        value={formData.bloodGroup}
                         disabled
                         className="font-semibold"
                       />
@@ -128,8 +163,8 @@ export default function Profile() {
                     <Label htmlFor="age">Age</Label>
                     <Input
                       id="age"
-                      value={profile.age}
-                      onChange={(e) => setProfile({ ...profile, age: e.target.value })}
+                      value={formData.age}
+                      onChange={(e) => setFormData({ ...formData, age: e.target.value })}
                       disabled={!isEditing}
                     />
                   </div>
@@ -138,9 +173,8 @@ export default function Profile() {
                     <Label htmlFor="gender">Gender</Label>
                     <Input
                       id="gender"
-                      value={profile.gender}
-                      onChange={(e) => setProfile({ ...profile, gender: e.target.value })}
-                      disabled={!isEditing}
+                      value={formData.gender}
+                      disabled
                     />
                   </div>
 
@@ -150,32 +184,12 @@ export default function Profile() {
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <Input
                         id="location"
-                        value={profile.location}
-                        onChange={(e) => setProfile({ ...profile, location: e.target.value })}
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                         disabled={!isEditing}
                       />
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="emergency">Emergency Contact</Label>
-                    <Input
-                      id="emergency"
-                      value={profile.emergencyContact}
-                      onChange={(e) => setProfile({ ...profile, emergencyContact: e.target.value })}
-                      disabled={!isEditing}
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="address">Full Address</Label>
-                  <Input
-                    id="address"
-                    value={profile.address}
-                    onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                    disabled={!isEditing}
-                  />
                 </div>
               </CardContent>
             </Card>

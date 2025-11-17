@@ -1,13 +1,37 @@
-import { useState } from "react";
-import { Header } from "@/components/Header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import Header from "@/components/Header";
+import { useAuth } from "@/contexts/AuthContext";
+import { notificationService } from "@/services/notification.service";
+import { Notification } from "@/lib/mockData";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bell, AlertCircle, Info, Calendar, CheckCircle } from "lucide-react";
-import { mockNotifications, Notification } from "@/lib/mockData";
+import { Bell, AlertCircle, Info, Calendar, CheckCircle, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [filter, setFilter] = useState<string>("all");
+
+  useEffect(() => {
+    loadNotifications();
+  }, [user]);
+
+  const loadNotifications = async () => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+      const result = await notificationService.getUserNotifications(user.id);
+      setNotifications(result);
+    } catch (error) {
+      toast.error("Failed to load notifications");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getIcon = (type: Notification["type"]) => {
     switch (type) {
@@ -24,23 +48,49 @@ export default function Notifications() {
     }
   };
 
-  const markAsRead = (id: string) => {
-    setNotifications(
-      notifications.map((notif) =>
-        notif.id === id ? { ...notif, read: true } : notif
-      )
-    );
+  const markAsRead = async (id: string) => {
+    try {
+      await notificationService.markAsRead(id);
+      loadNotifications(); // Reload to update UI
+    } catch (error) {
+      toast.error("Failed to mark as read");
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications(notifications.map((notif) => ({ ...notif, read: true })));
+  const markAllAsRead = async () => {
+    if (!user) return;
+
+    try {
+      await notificationService.markAllAsRead(user.id);
+      toast.success("All notifications marked as read");
+      loadNotifications();
+    } catch (error) {
+      toast.error("Failed to update notifications");
+    }
   };
+
+  const filteredNotifications = notifications.filter((n) => {
+    if (filter === "all") return true;
+    if (filter === "unread") return !n.read;
+    return n.type === filter;
+  });
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading notifications...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <Header userRole="donor" userName="Current User" notificationCount={unreadCount} />
+    <div className="min-h-screen bg-gradient-hero">
+      <Header />
 
       <main className="container py-8 max-w-4xl">
         <div className="mb-8 flex items-center justify-between">
@@ -58,7 +108,7 @@ export default function Notifications() {
         </div>
 
         <div className="space-y-4">
-          {notifications.map((notification) => (
+          {filteredNotifications.map((notification) => (
             <Card
               key={notification.id}
               className={`transition-all ${!notification.read ? "border-primary bg-accent/20" : ""}`}
@@ -98,7 +148,7 @@ export default function Notifications() {
           ))}
         </div>
 
-        {notifications.length === 0 && (
+        {filteredNotifications.length === 0 && (
           <Card className="p-12 text-center">
             <Bell className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">No Notifications</h3>
