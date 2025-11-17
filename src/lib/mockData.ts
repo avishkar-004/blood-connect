@@ -291,3 +291,153 @@ export const canReceiveFrom = (recipient: BloodType, donor: BloodType): boolean 
   const compatibility = getCompatibleBloodTypes(donor);
   return compatibility.includes(recipient);
 };
+
+// User and Authentication types
+export type UserRole = "donor" | "recipient" | "admin";
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string; // In real app, this would be hashed
+  role: UserRole;
+  phone: string;
+  bloodGroup?: BloodType;
+  location: string;
+  age?: number;
+  gender?: "Male" | "Female" | "Other";
+  avatar?: string;
+  createdAt: string;
+  // Donor-specific fields
+  lastDonation?: string;
+  nextEligibleDate?: string;
+  totalDonations?: number;
+  available?: boolean;
+  // Additional fields
+  isActive: boolean;
+  emailVerified: boolean;
+}
+
+export interface CampBooking {
+  id: string;
+  userId: string;
+  campId: string;
+  bookingDate: string;
+  status: "Confirmed" | "Cancelled" | "Completed";
+  slotTime?: string;
+}
+
+// Mock Users (for authentication)
+export const mockUsers: User[] = [
+  {
+    id: "U001",
+    name: "Rajesh Kumar",
+    email: "donor@test.com",
+    password: "password123",
+    role: "donor",
+    phone: "+91 98765 43210",
+    bloodGroup: "O+",
+    location: "Delhi",
+    age: 28,
+    gender: "Male",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Rajesh",
+    createdAt: "2024-01-15T10:00:00Z",
+    lastDonation: "2024-08-15",
+    nextEligibleDate: "2025-02-15",
+    totalDonations: 8,
+    available: true,
+    isActive: true,
+    emailVerified: true,
+  },
+  {
+    id: "U002",
+    name: "Anita Verma",
+    email: "recipient@test.com",
+    password: "password123",
+    role: "recipient",
+    phone: "+91 98765 43220",
+    bloodGroup: "A+",
+    location: "Mumbai",
+    age: 35,
+    gender: "Female",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Anita",
+    createdAt: "2024-02-20T10:00:00Z",
+    isActive: true,
+    emailVerified: true,
+  },
+  {
+    id: "U003",
+    name: "Admin User",
+    email: "admin@test.com",
+    password: "admin123",
+    role: "admin",
+    phone: "+91 98765 43230",
+    location: "Delhi",
+    age: 40,
+    gender: "Male",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin",
+    createdAt: "2024-01-01T10:00:00Z",
+    isActive: true,
+    emailVerified: true,
+  },
+  {
+    id: "U004",
+    name: "Priya Sharma",
+    email: "priya@test.com",
+    password: "password123",
+    role: "donor",
+    phone: "+91 98765 43211",
+    bloodGroup: "A+",
+    location: "Mumbai",
+    age: 32,
+    gender: "Female",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Priya",
+    createdAt: "2024-03-10T10:00:00Z",
+    lastDonation: "2024-09-20",
+    nextEligibleDate: "2025-03-20",
+    totalDonations: 12,
+    available: true,
+    isActive: true,
+    emailVerified: true,
+  },
+  {
+    id: "U005",
+    name: "Amit Patel",
+    email: "amit@test.com",
+    password: "password123",
+    role: "donor",
+    phone: "+91 98765 43212",
+    bloodGroup: "B+",
+    location: "Bangalore",
+    age: 35,
+    gender: "Male",
+    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Amit",
+    createdAt: "2024-04-15T10:00:00Z",
+    lastDonation: "2024-07-10",
+    nextEligibleDate: "2025-01-10",
+    totalDonations: 15,
+    available: true,
+    isActive: true,
+    emailVerified: true,
+  },
+];
+
+// Mock Camp Bookings
+export const mockCampBookings: CampBooking[] = [
+  {
+    id: "B001",
+    userId: "U001",
+    campId: "C001",
+    bookingDate: "2024-11-15T14:30:00Z",
+    status: "Confirmed",
+    slotTime: "10:00 AM",
+  },
+  {
+    id: "B002",
+    userId: "U004",
+    campId: "C002",
+    bookingDate: "2024-11-14T09:20:00Z",
+    status: "Confirmed",
+    slotTime: "11:00 AM",
+  },
+];

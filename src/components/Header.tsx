@@ -1,6 +1,7 @@
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Bell, User, LogOut, Menu } from "lucide-react";
+import { Bell, User, LogOut, Droplet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -9,23 +10,37 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth } from "@/contexts/AuthContext";
+import { notificationService } from "@/services/notification.service";
 
-interface HeaderProps {
-  userRole?: "donor" | "recipient" | "admin";
-  userName?: string;
-  notificationCount?: number;
-}
-
-export const Header = ({ userRole, userName, notificationCount = 0 }: HeaderProps) => {
+export const Header = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const { user, logout } = useAuth();
+  const [notificationCount, setNotificationCount] = useState(0);
 
-  const handleLogout = () => {
+  useEffect(() => {
+    if (user) {
+      loadNotificationCount();
+    }
+  }, [user]);
+
+  const loadNotificationCount = async () => {
+    if (!user) return;
+    try {
+      const count = await notificationService.getUnreadCount(user.id);
+      setNotificationCount(count);
+    } catch (error) {
+      console.error("Error loading notification count:", error);
+    }
+  };
+
+  const handleLogout = async () => {
+    await logout();
     navigate("/auth");
   };
 
   const getDashboardLink = () => {
-    switch (userRole) {
+    switch (user?.role) {
       case "donor":
         return "/donor-dashboard";
       case "recipient":
@@ -40,14 +55,12 @@ export const Header = ({ userRole, userName, notificationCount = 0 }: HeaderProp
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between">
-        <Link to="/" className="flex items-center space-x-2">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-primary to-primary-glow flex items-center justify-center">
-            <span className="text-white font-bold text-sm">LL</span>
-          </div>
+        <Link to={getDashboardLink()} className="flex items-center space-x-2">
+          <Droplet className="h-8 w-8 text-primary" fill="currentColor" />
           <span className="font-bold text-xl text-foreground">LifeLink</span>
         </Link>
 
-        {userRole ? (
+        {user ? (
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -67,10 +80,15 @@ export const Header = ({ userRole, userName, notificationCount = 0 }: HeaderProp
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="gap-2">
                   <User className="h-5 w-5" />
-                  <span className="hidden sm:inline">{userName || "User"}</span>
+                  <span className="hidden sm:inline">{user.name}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                <div className="px-2 py-1.5">
+                  <p className="text-sm font-medium">{user.name}</p>
+                  <p className="text-xs text-muted-foreground">{user.email}</p>
+                </div>
+                <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate(getDashboardLink())}>
                   Dashboard
                 </DropdownMenuItem>
@@ -102,3 +120,5 @@ export const Header = ({ userRole, userName, notificationCount = 0 }: HeaderProp
     </header>
   );
 };
+
+export default Header;

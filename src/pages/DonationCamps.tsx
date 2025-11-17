@@ -1,26 +1,75 @@
-import { useState } from "react";
-import { Header } from "@/components/Header";
+import { useEffect, useState } from "react";
+import Header from "@/components/Header";
+import { useAuth } from "@/contexts/AuthContext";
+import { donorService } from "@/services/donor.service";
+import { DonationCamp } from "@/lib/mockData";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, MapPin, Clock, Users, Building } from "lucide-react";
-import { mockDonationCamps } from "@/lib/mockData";
-import { useToast } from "@/hooks/use-toast";
+import { Calendar, MapPin, Clock, Users, Building, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function DonationCamps() {
-  const [camps] = useState(mockDonationCamps);
-  const { toast } = useToast();
+  const { user } = useAuth();
+  const [camps, setCamps] = useState<DonationCamp[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [bookingInProgress, setBookingInProgress] = useState<string | null>(null);
 
-  const handleRegister = (campName: string) => {
-    toast({
-      title: "Registration Successful",
-      description: `You have been registered for ${campName}`,
-    });
+  useEffect(() => {
+    loadCamps();
+  }, []);
+
+  const loadCamps = async () => {
+    try {
+      setIsLoading(true);
+      const result = await donorService.getUpcomingCamps();
+      setCamps(result);
+    } catch (error) {
+      toast.error("Failed to load camps");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  const handleRegister = async (campId: string, campName: string) => {
+    if (!user) {
+      toast.error("Please login to book a camp");
+      return;
+    }
+
+    try {
+      setBookingInProgress(campId);
+      const result = await donorService.bookCampSlot(user.id, campId);
+
+      if (result.success) {
+        toast.success("Registration Successful", {
+          description: `You have been registered for ${campName}`,
+        });
+        loadCamps(); // Reload to show updated slots
+      } else {
+        toast.error(result.error || "Booking failed");
+      }
+    } catch (error) {
+      toast.error("An error occurred");
+    } finally {
+      setBookingInProgress(null);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-hero flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading camps...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <Header userRole="donor" userName="Current User" notificationCount={2} />
+    <div className="min-h-screen bg-gradient-hero">
+      <Header />
 
       <main className="container py-8">
         <div className="mb-8">
@@ -75,11 +124,20 @@ export default function DonationCamps() {
 
                   <div className="pt-4 border-t">
                     <Button
-                      onClick={() => handleRegister(camp.name)}
+                      onClick={() => handleRegister(camp.id, camp.name)}
                       className="w-full"
-                      disabled={camp.slotsAvailable === 0}
+                      disabled={bookingInProgress === camp.id || camp.slotsAvailable === 0}
                     >
-                      {camp.slotsAvailable === 0 ? "Fully Booked" : "Register Now"}
+                      {bookingInProgress === camp.id ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Booking...
+                        </>
+                      ) : camp.slotsAvailable === 0 ? (
+                        "Fully Booked"
+                      ) : (
+                        "Register Now"
+                      )}
                     </Button>
                   </div>
                 </CardContent>
