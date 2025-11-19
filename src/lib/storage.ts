@@ -249,7 +249,7 @@ export const storage = {
     storage.removeCurrentUser();
   },
 
-  clearAll: (): void => {
+  clearAll: (): void => { // Clears all persisted data
     Object.values(STORAGE_KEYS).forEach((key) => {
       localStorage.removeItem(key);
     });
